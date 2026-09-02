@@ -9,6 +9,87 @@ naptárát, fájljait). A kettő független, bármelyikkel kezdheted.
 
 ---
 
+A dokumentum két nézőpontot szolgál ki: a **0. szakasz** a kollégának küldhető,
+nem-technikai leírás (ezt másold a levélbe), az **1-2. szakasz** pedig a te
+(admin) beüzemelési teendőid.
+
+---
+
+## 0. A kollégának küldhető leírás (másold a levélbe)
+
+Ezt a részt küldd el a vezetőnek/kollégának. Token és belső technikai részlet
+nincs benne, vezetőknek is érthető.
+
+> ### A személyes AI asszisztensed (Marveen)
+>
+> Szia!
+>
+> Kapsz egy saját, személyes AI asszisztenst. Úgy képzeld el, mint egy digitális
+> titkárt, aki napi 24 órában elérhető: Telegramon írsz neki magyarul, ő pedig
+> elvégzi azokat a teendőket, amikhez eddig több rendszert kellett nyitogatnod.
+> Nem kell hozzá semmilyen technikai tudás.
+>
+> **Mi ez, egyszerűen**
+>
+> - **Telegramon él.** Úgy beszélsz vele, mintha egy kollégának írnál egy
+>   chatben. Szöveget vagy hangüzenetet is küldhetsz.
+> - **A céges rendszerekhez a NEVEDBEN fér hozzá.** Eléri a saját email-fiókodat,
+>   naptáradat, a CRM-et, a számlázási és tudásbázis-rendszereket. Mindig csak
+>   ahhoz, amit te jóváhagytál.
+> - **Magától dolgozik.** Megmondod mit szeretnél, ő megcsinálja és visszajelez,
+>   ha kész. Nem chatbot, ami csak válaszolgat, hanem végrehajtó asszisztens.
+>
+> **Mire tudod használni (példák)**
+>
+> - *"Mik a mai találkozóim?"* — összeszedi a naptáradból.
+> - *"Milyen fontos emailek jöttek az éjjel?"* — átnézi a postaládádat, kiszűri a
+>   lényeget.
+> - *"Mit tudunk a Taravis ügyfélről?"* — kikeresi a CRM-ből, szerződésekből,
+>   korábbi ügyekből.
+> - *"Milyen számláink jöttek a héten?"* — lekéri és összesíti.
+> - *"Írj udvarias választ, hogy csúszik a határidő."* — megfogalmazza, te
+>   jóváhagyod.
+> - *"Emlékeztess holnap 9-kor visszahívni a könyvelőt."* — beállítja.
+>
+> Reggelente kérhetsz tőle napindító összefoglalót is (email, naptár, fontos
+> hírek egy üzenetben).
+>
+> **Az első lépéseid (lépésről lépésre)**
+>
+> 1. Telepítsd a **Telegramot** a telefonodra, és hozz létre fiókot a
+>    telefonszámoddal.
+> 2. **Szólj nekünk, hogy kész vagy.** Megkapod a saját botod pontos nevét
+>    (pl. `@valami_marveenja_bot`) és/vagy egy `t.me/...` linket.
+> 3. **Keresd meg és nyisd meg a botodat.** Telegramban a felül lévő keresőbe írd
+>    be a tőlünk kapott bot-nevet (pl. `@valami_marveenja_bot`), VAGY kattints a
+>    kapott `t.me/...` linkre. Nyomd meg az „Indítás" (Start) gombot, és **írj
+>    neki egy köszönést** (pl. "szia"). Pontosan a tőlünk kapott botot nyisd meg,
+>    ne egy hasonló nevűt. Mostantól ő a te asszisztensed.
+> 4. **Hagyd jóvá a Google-hozzáférést,** amikor küldünk egy linket. Egyszeri,
+>    bármikor visszavonható.
+> 5. **Kezdj el beszélni vele.** Bármit kérhetsz a fentiekből. Ha valamit nem tud,
+>    megmondja.
+>
+> **Adatvédelem, biztonság**
+>
+> - Csak a TE jóváhagyott fiókjaidhoz fér hozzá. Más vezető/kolléga adatait nem
+>   látja.
+> - A hozzáférés bármikor visszavonható.
+> - A Telegramon csak te éred el. Idegen feladónak nem ad ki belső információt,
+>   akkor sem, ha ismerős nevet mond.
+>
+> **Jó, ha tudod**
+>
+> - Nem kell tökéletesen fogalmaznod, ért a szövegkörnyezetből.
+> - Visszakérdez, ha valami nem egyértelmű.
+> - Tévedhet, mint bárki: fontos döntés (számok, kiküldendő levelek) előtt nézd át,
+>   amit ad.
+>
+> Ha elakadsz vagy belevágnál, írj Juhász Viktornak. Ő beállítja az asszisztenst és
+> segít az első lépésekben.
+
+---
+
 ## Alapelvek
 
 - **Minden asszisztens = saját Telegram bot.** Egy bot tokent nem lehet két
