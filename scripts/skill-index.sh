@@ -65,7 +65,13 @@ index_skills_dir() {
     fi
 
     local desc
-    desc=$(grep -m1 "^description:" "$skill_md" 2>/dev/null | sed 's/^description: *//' | tr -d '"' | tr -d "'" | cut -c1-120)
+    # NOTE: `cut -c` counts BYTES, not characters (GNU coreutils). With Hungarian
+    # descriptions that cut a multi-byte UTF-8 char in half, producing an invalid
+    # byte sequence. grep then treats the whole index as BINARY and silently
+    # returns nothing -- so "no covering skill found" became a false negative in
+    # exactly the file we search for skill discovery. Truncate by CHARACTERS.
+    desc=$(grep -m1 "^description:" "$skill_md" 2>/dev/null | sed 's/^description: *//' | tr -d '"' | tr -d "'" \
+      | python3 -c 'import sys; sys.stdin.reconfigure(errors="replace"); sys.stdout.write(sys.stdin.read()[:120])')
     if [ -z "$desc" ]; then
       desc="(nincs leírás)"
     fi
