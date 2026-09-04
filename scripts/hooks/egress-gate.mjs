@@ -132,6 +132,90 @@ const QUARANTINE_DOMAINS = [
   { domain: 'www.reddit.com', path: (p) => p.endsWith('.rss') },
 ]
 
+// The reader's tier is a DENYLIST, not an allowlist (owner decision, 2026-09-04).
+//
+// Why the inversion is safe here and nowhere else: this tier is reachable only
+// by a sub-agent whose definition grants it `tools: WebFetch` and nothing else.
+// It has no shell, no filesystem, no store access -- it cannot read a token or
+// a memory, so it has nothing to leak. What it returns is data the caller must
+// wrap before use. The main agent's own WebFetch stays on the allowlist above:
+// that is the path that could carry something out, and it is unchanged.
+//
+// Measured before the change: store/egress-blocked.log held 7 entries since
+// 2026-08-14, every one of them a legitimate public read (mnb.hu, Claude docs,
+// a Schueco product PDF, two company sites). Zero exfiltration attempts, seven
+// stopped reads -- and that undercounts, because agents learn not to try.
+//
+// What the denylist must stop is NOT exfiltration but SSRF: a poisoned page
+// talking the caller into aiming the reader at our own network. Hence the
+// literal-address and internal-suffix rules below.
+const QUARANTINE_DENY_HOSTS = new Set([
+  'localhost',
+  'localhost.localdomain',
+  'broadcasthost',
+  '0.0.0.0',
+  '::',
+  '::1',
+  '[::]',
+  '[::1]',
+  'metadata.google.internal',
+  'instance-data',
+])
+
+const QUARANTINE_DENY_SUFFIXES = ['.localhost', '.local', '.internal', '.home.arpa', '.lan']
+
+// Private / link-local / loopback IPv4 literals, plus the cloud metadata
+// address (169.254.169.254 is inside the link-local range and thus covered).
+function isPrivateIPv4(host) {
+  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host)
+  if (!m) return false
+  const [a, b] = [Number(m[1]), Number(m[2])]
+  if (m.slice(1).some((x) => Number(x) > 255)) return true // malformed -> deny
+  if (a === 10 || a === 127 || a === 0) return true
+  if (a === 172 && b >= 16 && b <= 31) return true
+  if (a === 192 && b === 168) return true
+  if (a === 169 && b === 254) return true
+  if (a === 100 && b >= 64 && b <= 127) return true // CGNAT
+  return false
+}
+
+// IPv6 loopback / unique-local / link-local, with or without brackets.
+function isPrivateIPv6(host) {
+  const h = host.replace(/^\[|\]$/g, '').toLowerCase()
+  if (!h.includes(':')) return false
+  if (h === '::1' || h === '::') return true
+  if (h.startsWith('fc') || h.startsWith('fd')) return true // unique-local
+  if (h.startsWith('fe80')) return true // link-local
+  // IPv4-mapped (::ffff:10.0.0.1) -- reuse the v4 rules on the tail.
+  const tail = h.split(':').pop() ?? ''
+  if (tail.includes('.')) return isPrivateIPv4(tail)
+  return false
+}
+
+// KNOWN LIMIT, stated rather than papered over: this checks the hostname as
+// written. A public name that RESOLVES to a private address (DNS rebinding)
+// still passes, because the hook sees the URL, not the socket. Closing that
+// needs resolution at fetch time, which is not this layer's job.
+export function isQuarantineDenied(url) {
+  let parsed
+  try {
+    parsed = new URL(url)
+  } catch {
+    return true // unparseable -> deny
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return true
+  const host = parsed.hostname.toLowerCase()
+  if (!host) return true
+  if (QUARANTINE_DENY_HOSTS.has(host)) return true
+  if (QUARANTINE_DENY_SUFFIXES.some((s) => host.endsWith(s))) return true
+  if (isPrivateIPv4(host)) return true
+  if (isPrivateIPv6(host)) return true
+  return false
+}
+
+// Kept for the shipped feeds and operator additions: these stay allowed even
+// if a future denylist entry would otherwise catch them, so the reader's
+// long-standing sources cannot silently break.
 function matchesQuarantineDomain(url, extraDomains = []) {
   let parsed
   try {
@@ -198,6 +282,18 @@ export function egressDecision(
   const url = String(toolInput?.url ?? '')
   if (!url) return { blocked: false, tier: 'no-url' }
 
+  // 0. Reader denylist, BEFORE every allow path.
+  //    Order matters and was found by a test, not by reading: the built-in
+  //    prefixes include this install's own dashboard (http://localhost:PORT/),
+  //    so with the denylist checked only in step 4 the reader would have
+  //    reached localhost through step 1 -- the one address the denylist exists
+  //    to refuse. An allowlist that predates the inversion must not be able to
+  //    re-open what the inversion walls off, so for this agent type the deny
+  //    rules are absolute.
+  if (String(agentType ?? '') === QUARANTINE_AGENT_TYPE && isQuarantineDenied(url)) {
+    return { blocked: true, tier: 'quarantine-denied' }
+  }
+
   // 1. Built-in prefix check (startsWith is correct here: the prefix already
   //    includes the trailing slash so a prefix-extension attack is impossible,
   //    e.g. 'https://api.github.com.evil.com/' does not start with
@@ -226,10 +322,21 @@ export function egressDecision(
   // 4. Quarantine tier -- the ONLY tier a main agent cannot reach. Exact
   //    agent_type match required (fail-closed: anything else falls through to
   //    the block below).
+  //
+  //    Two sub-cases, in this order:
+  //    (a) the shipped feeds and operator additions -- allowed as before, so a
+  //        denylist change can never silently break a long-standing source;
+  //    (b) anything else -- allowed UNLESS the denylist catches it. This is the
+  //        inversion the owner approved: reading is open, and only our own
+  //        network is walled off.
   if (String(agentType ?? '') === QUARANTINE_AGENT_TYPE) {
     if (matchesQuarantineDomain(url, runtimeList.quarantineDomains ?? [])) {
       return { blocked: false, tier: 'quarantine' }
     }
+    if (!isQuarantineDenied(url)) {
+      return { blocked: false, tier: 'quarantine-open' }
+    }
+    return { blocked: true, tier: 'quarantine-denied' }
   }
 
   return { blocked: true, tier: 'none' }

@@ -74,8 +74,54 @@ describe('the quarantine tier', () => {
     expect(isEgressBlocked('WebFetch', feed, EMPTY, undefined)).toBe(true)
   })
 
-  it('blocks a domain the quarantine-reader was never given', () => {
-    expect(isEgressBlocked('WebFetch', { url: 'https://evil.example/feed' }, EMPTY, QUARANTINE)).toBe(true)
+  it('now LETS the reader fetch a public domain it was never given (2026-09-04 inversion)', () => {
+    // This assertion used to read `toBe(true)`, and flipping it is the whole
+    // point of the change, not an accident: the owner asked for open reading
+    // after the block log showed seven stopped reads and zero exfiltration
+    // attempts since 2026-08-14. The reader has `tools: WebFetch` and nothing
+    // else -- no shell, no filesystem, no store -- so it holds no secret to
+    // leak. What replaces the allowlist is the denylist below, and the main
+    // agent's own path (the test above) is deliberately unchanged.
+    expect(isEgressBlocked('WebFetch', { url: 'https://evil.example/feed' }, EMPTY, QUARANTINE)).toBe(false)
+    expect(egressDecision('WebFetch', { url: 'https://evil.example/feed' }, EMPTY, QUARANTINE).tier).toBe('quarantine-open')
+  })
+
+  it('refuses our own network even for the reader, and does it BEFORE any allow path', () => {
+    // Order is the substance here. The built-in prefixes include this install's
+    // own dashboard, so a denylist consulted only at the quarantine step would
+    // have let the reader reach localhost through the built-in tier -- the one
+    // address the denylist exists to refuse. Found by a test, not by reading.
+    const internal = [
+      'http://localhost:3420/api/memories',
+      'http://127.0.0.1:8080/',
+      'http://169.254.169.254/latest/meta-data/',
+      'http://10.0.85.98:9000/',
+      'http://192.168.1.1/',
+      'http://172.20.0.5/',
+      'http://100.100.0.1/',
+      'http://[::1]/',
+      'http://[fd00::1]/',
+      'http://[fe80::1]/',
+      'http://printer.local/',
+      'http://box.internal/',
+      'http://metadata.google.internal/',
+      'file:///etc/passwd',
+    ]
+    for (const url of internal) {
+      expect(egressDecision('WebFetch', { url }, EMPTY, QUARANTINE).tier).toBe('quarantine-denied')
+    }
+    // ...and the neighbours of those ranges stay reachable, so the rule is a
+    // rule and not a superstition about numbers that look private.
+    for (const url of ['http://172.15.0.5/', 'http://172.32.0.5/', 'http://11.0.0.1/', 'http://100.63.0.1/']) {
+      expect(isEgressBlocked('WebFetch', { url }, EMPTY, QUARANTINE)).toBe(false)
+    }
+  })
+
+  it('keeps the denylist away from the main agent path', () => {
+    // The main agent may still reach its own dashboard through the built-in
+    // prefixes: the inversion narrows the reader, it does not widen or narrow
+    // anyone else.
+    expect(isEgressBlocked('WebFetch', { url: 'http://localhost:3420/api/memories' }, EMPTY, '')).toBe(false)
   })
 
   it('fails closed on anything that is not an exact agent_type match', () => {
@@ -86,12 +132,15 @@ describe('the quarantine tier', () => {
     }
   })
 
-  it('holds the reddit promise its definition makes: RSS only', () => {
-    // The sub-agent's definition allows reddit RSS feeds; hostname matching
-    // alone would hand over the whole site, including the json endpoints a
-    // main agent was blocked from earlier.
-    expect(isEgressBlocked('WebFetch', { url: 'https://www.reddit.com/r/devops/new.rss' }, EMPTY, QUARANTINE)).toBe(false)
-    expect(isEgressBlocked('WebFetch', { url: 'https://www.reddit.com/r/devops/about/rules.json' }, EMPTY, QUARANTINE)).toBe(true)
+  it('reddit: the RSS path still matches by name, and the rest is open like any public site', () => {
+    // The path rule predates the inversion, when hostname-only matching would
+    // have handed over the whole site while the definition promised feeds. It
+    // is kept because the shipped sources must not depend on the new tier, but
+    // it no longer decides anything: a non-RSS reddit URL is now reachable for
+    // the same reason any other public URL is. Stated rather than left as a
+    // surprise for whoever next reads the path callback and assumes it blocks.
+    expect(egressDecision('WebFetch', { url: 'https://www.reddit.com/r/devops/new.rss' }, EMPTY, QUARANTINE).tier).toBe('quarantine')
+    expect(egressDecision('WebFetch', { url: 'https://www.reddit.com/r/devops/about/rules.json' }, EMPTY, QUARANTINE).tier).toBe('quarantine-open')
   })
 
   it('inherits the ordinary allowlist rather than replacing it', () => {
