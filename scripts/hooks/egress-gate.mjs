@@ -132,7 +132,9 @@ const QUARANTINE_DOMAINS = [
   { domain: 'www.reddit.com', path: (p) => p.endsWith('.rss') },
 ]
 
-// The reader's tier is a DENYLIST, not an allowlist (owner decision, 2026-09-04).
+// The reader's tier is a DENYLIST, not an allowlist. This is a proposal, not
+// the implementation of a decision recorded here: the posture change needs the
+// owner's sign-off before merge, and no code comment can stand in for it.
 //
 // Why the inversion is safe here and nowhere else: this tier is reachable only
 // by a sub-agent whose definition grants it `tools: WebFetch` and nothing else.
