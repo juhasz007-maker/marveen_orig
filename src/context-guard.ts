@@ -255,9 +255,26 @@ export const CALIBRATION_OVERSHOOT_TOLERANCE = 1.25
  * did not guess is measured against the smaller tier until it exceeds it by the
  * tolerance -- e.g. a genuine 500k window observed in 200000..250000 reads as
  * over-full and may be restarted once before it grows past the step-up point.
- * No model in the fleet is configured that way today (every agent resolves to a
- * 200k window; only the `[1m]` suffix selects a larger one), and `limitTokens`
- * pins the denominator explicitly when an operator knows better.
+ *
+ * That residual is worse than "once" when the under-guess is a whole tier, and
+ * this is the reason contextLimitForModel's family regexes above are load-
+ * bearing rather than belt-and-braces. Step-up needs an OBSERVATION above
+ * `limit * 1.25` (250_000 on a 200k base), but the guard restarts at 90-97% of
+ * the assumed limit (180_000-194_000 on the same base) -- below the step-up
+ * point. A 1M session denominated at 200k is therefore killed before it can
+ * ever produce the evidence that would correct the denominator, and the loop
+ * does not self-resolve; only the runner's PERSISTED high-water mark breaks it,
+ * and only if some earlier session already got past 250_000.
+ *
+ * So `[1m]` is NOT the only thing that selects a larger window, and treating it
+ * as such would regress two agents on this host (measured 2026-09-17):
+ *   - the main agent's model id comes from the live transcript's
+ *     `message.model` (see web/active-model.ts), i.e. an API model id, which
+ *     never carries the `[1m]` config suffix -- it reads `claude-opus-5` while
+ *     the process genuinely runs a 1M window (high-water 954_694);
+ *   - `claude-fable-5` is configured without the suffix and reached 507_128.
+ * Both are held at 1M by the family regexes alone. `limitTokens` remains the
+ * explicit per-agent override when an operator knows better.
  */
 export function calibrateLimit(observedTokens: number, baseLimit: number): number {
   const explains = (limit: number): boolean =>
