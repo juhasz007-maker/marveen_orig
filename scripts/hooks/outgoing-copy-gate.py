@@ -764,7 +764,24 @@ def accent_check_tokens(prose: str):
         # accent-stripped "és". These are not prose words; they carry no accent.
         # (2026-08-21: the gate blocked a correct message reading "429-es vagy
         # 403-as". GATEKOTOJEL817 covered letter-hyphen-letter forms, not this one.)
-        if m.start() >= 2 and prose[m.start() - 1] == "-" and prose[m.start() - 2].isdigit():
+        # GATEIDEZRAG1005 (2026-10-05, attilamarveenja measured it live; his
+        # Telegram reply was blocked on a CORRECT sentence). The digit test above
+        # was too narrow: ANY non-letter between the word and the hyphen cuts the
+        # token the same way, because HYPHEN_WORD joins LETTERS only. A closing
+        # quote does it ('"smart support"-ot'), and so do ')', ']', '%', an
+        # apostrophe, a backtick and the Hungarian closing quote. The suffix then
+        # stands alone and "ot" is read as the accent-stripped "öt".
+        # The widening is to "not whitespace", not to "any character": if a SPACE
+        # precedes the hyphen, the token really is a standalone word (a list
+        # bullet "- ot darab", or a suffix orphaned by strip_technical), and
+        # those must stay under the check. Measured on 3000 real messages:
+        # this form removes 9 false positives and loses NO true catch, while the
+        # wider "any preceding character" form also drops a real one ("-javitas").
+        if (
+            m.start() >= 2
+            and prose[m.start() - 1] == "-"
+            and not prose[m.start() - 2].isspace()
+        ):
             continue
         if "-" not in tok and tok[0].isupper() and not _at_sentence_start(prose, m.start()):
             continue

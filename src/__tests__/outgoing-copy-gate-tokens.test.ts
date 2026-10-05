@@ -118,3 +118,52 @@ describe('outgoing-copy gate tokenization: a Hungarian suffix on a dotted filena
     expect(probs[0]).toContain('küldj át ot darabot')
   })
 })
+
+describe('outgoing-copy gate tokenization: a suffix after a closing quote (GATEIDEZRAG1005)', () => {
+  // attilamarveenja measured this live on 2026-10-05: his Telegram reply was
+  // BLOCKED on a CORRECT sentence, reported as `ot -> öt`, where the text read
+  // `"smart support"-ot`. The digit guard above was too narrow: it only knew
+  // about a suffix hanging off a NUMBER. Any non-letter between the word and the
+  // hyphen cuts the token the same way, because HYPHEN_WORD joins letters only
+  // -- a closing quote, ')', ']', '%', an apostrophe, a backtick.
+  //
+  // Every sentence below carries at least three HU_MARKERS on purpose. Without
+  // them is_hungarian() is false, the accent branch never runs, and the test
+  // would pass on the BROKEN gate too -- measured: a first draft of these cases
+  // did exactly that.
+
+  it('a Hungarian suffix after a closing double quote passes (the measured sentence)', () => {
+    expect(auditAccent('Köszönöm, hogy már átküldted: a kérésben "smart support"-ot írt, tehát nem kell újra kérdezni.')).toEqual([])
+  })
+
+  it('a suffix after a percent sign passes (a very common Hungarian form)', () => {
+    expect(auditAccent('Köszönöm, hogy már átküldted: a tervhez képest a 20%-ot elértük, tehát nem kell újra mérni.')).toEqual([])
+  })
+
+  it('a suffix after a closing parenthesis passes', () => {
+    expect(auditAccent('Köszönöm, hogy már átküldted: a mappát (teljes archívum)-ot néztem, tehát nem kell újra keresni.')).toEqual([])
+  })
+
+  it('REGRESSION GUARD (passes before and after): the digit form stays clean', () => {
+    // This one does not exercise the new branch -- it protects GATEHYPH816 from a
+    // future edit to the same condition. Kept, and labelled, so nobody reads it
+    // as evidence for the fix.
+    expect(auditAccent('Köszönöm, hogy már átküldted: 429-es vagy 403-as kódot kapsz, tehát nem kell újra próbálni.')).toEqual([])
+  })
+
+  it('a standalone "ot" in prose still fails: the widening must not become a whitelist', () => {
+    const probs = auditAccent('Köszönöm, hogy már átküldted, de ot darab maradt a polcon, tehát nem kell újra rendelni.')
+    expect(probs.length).toBe(1)
+    expect(probs[0]).toContain('ot -> öt')
+  })
+
+  it('a list bullet keeps the word under the check: a SPACE before the hyphen is not a suffix', () => {
+    // `- ot darab` is a bullet, not a suffix. This is why the widening stops at
+    // "not whitespace" instead of "any preceding character". The wider form also
+    // drops a real catch: measured on 3000 messages it loses `-javitas`, an
+    // accentless prose word orphaned by strip_technical.
+    const probs = auditAccent('Köszönöm, hogy már átküldted. A maradék: - ot darab van a polcon, tehát nem kell újra rendelni.')
+    expect(probs.length).toBe(1)
+    expect(probs[0]).toContain('ot -> öt')
+  })
+})
